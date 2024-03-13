@@ -30,8 +30,31 @@ function Send-DiscordWebhook {
         Invoke-RestMethod -Uri $WebhookUrl -Method Post -Body $body -Headers $headers
     }
     if(-not ([string]::IsNullOrEmpty($File))) {
-        # Send the POST request to the Discord webhook
-        Invoke-RestMethod -Uri $WebhookUrl -Method Post -InFile $File -ContentType 'text/plain'
+        # Read the file content
+        $fileBytes = [System.IO.File]::ReadAllBytes($File)
+        $fileEncoded = [System.Convert]::ToBase64String($fileBytes)
+
+        # Prepare the body as multipart/form-data
+        $boundary = [System.Guid]::NewGuid().ToString()
+        $LF = "`r`n"
+        $bodyLines = (
+            "--$boundary",
+            "Content-Disposition: form-data; name=`"file0`"; filename=`"$(Split-Path -Path $File -Leaf)`"",
+            "Content-Type: application/octet-stream$LF",
+            $fileEncoded,
+            "--$boundary--$LF"
+        ) -join $LF
+
+        # Convert the body to a byte array
+        $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($bodyLines)
+
+        # Prepare headers
+        $headers = @{
+            "Content-Type" = "multipart/form-data; boundary=$boundary"
+        }
+
+        # Send the request
+        Invoke-RestMethod -Uri $WebhookUrl -Method Post -ContentType "multipart/form-data" -Headers $headers -Body $bodyBytes
     }
 }
 
