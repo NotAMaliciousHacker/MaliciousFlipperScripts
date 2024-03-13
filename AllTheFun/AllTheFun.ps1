@@ -17,7 +17,7 @@ function Send-DiscordWebhook {
         $LF = "`r`n"
         $fileName = [System.IO.Path]::GetFileName($File)
         $fileContent = [System.IO.File]::ReadAllBytes($File)
-        $encodedFileContent = [System.Convert]::ToString($fileContent)
+        $encodedFileContent = [System.Convert]::ToBase64String($fileContent)
 
         $bodyLines = @(
             "--$boundary",
