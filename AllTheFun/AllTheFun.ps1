@@ -30,7 +30,8 @@ function Send-DiscordWebhook {
         Invoke-RestMethod -Uri $WebhookUrl -Method Post -Body $body -Headers $headers
     }
     if(-not ([string]::IsNullOrEmpty($File))) {
-        curl.exe -F "file1=@$file" $WebhookUrl
+        # Send the POST request to the Discord webhook
+        Invoke-RestMethod -Uri $WebhookUrl -Method Post -InFile $File -ContentType 'text/plain'
     }
 }
 
