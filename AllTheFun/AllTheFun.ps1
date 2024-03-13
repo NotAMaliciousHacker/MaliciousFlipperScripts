@@ -16,25 +16,27 @@ function Send-DiscordWebhook {
     )
 
     if(-not ([string]::IsNullOrEmpty($Message))) {
-        # Create a hashtable for the body
-        $body = @{
-            content = "Source: " + $Source + "," + "Value: " + $Message
-        } | ConvertTo-Json
+        $boundary = [System.Guid]::NewGuid().ToString()
+        $LF = "`r`n"
+        $fileName = [System.IO.Path]::GetFileName($File)
+        $fileContent = [System.IO.File]::ReadAllBytes($File)
+        $encodedFileContent = [System.Convert]::ToBase64String($fileContent)
 
-        # Set headers for the HTTP request
+        $bodyLines = @(
+            "--$boundary",
+            "Content-Disposition: form-data; name=`"file0`"; filename=`"$fileName`"",
+            "Content-Type: application/octet-stream$LF",
+            $encodedFileContent,
+            "--$boundary--$LF"
+        ) -join $LF
+
+        $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($bodyLines)
+
         $headers = @{
-            "Content-Type" = "application/json"
+            "Content-Type" = "multipart/form-data; boundary=$boundary"
         }
 
-        # Send the POST request to the Discord webhook
-        Invoke-RestMethod -Uri $WebhookUrl -Method Post -Body $body -Headers $headers
-    }
-    if(-not ([string]::IsNullOrEmpty($File))) {
-        $Form = @{
-            username  = $env:USER
-            file     = Get-Item -Path $File
-        }
-        Invoke-WebRequest -Uri $WebhookUrl -Method Post -Form $Form
+        Invoke-RestMethod -Uri $WebhookUrl -Method Post -Headers $headers -Body $bodyBytes
     }
 }
 
