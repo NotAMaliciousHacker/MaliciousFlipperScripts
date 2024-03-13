@@ -34,23 +34,26 @@ function Send-DiscordWebhook {
         $LF = "`r`n"
         $fileName = [System.IO.Path]::GetFileName($File)
         $fileContent = [System.IO.File]::ReadAllBytes($File)
-        # $encodedFileContent = [System.Convert]::ToBase64String($fileContent)
 
         $bodyLines = @(
             "--$boundary",
             "Content-Disposition: form-data; name=`"file0`"; filename=`"$fileName`"",
             "Content-Type: application/octet-stream$LF",
             $fileContent,
-            "--$boundary--$LF"
-        ) -join $LF
+            "--$boundary--"
+        )
 
-        $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($bodyLines)
+        $body = $bodyLines -join $LF
+        $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($body)
+        # Manually insert the file content in the correct position (after headers, before the final boundary)
+        $fileContentStart = $body.IndexOf($fileContent)
+        $bodyBytes[$fileContentStart..($fileContentStart+$fileContent.Length-1)] = $fileContent
 
         $headers = @{
             "Content-Type" = "multipart/form-data; boundary=$boundary"
         }
 
-        Invoke-RestMethod -Uri $WebhookUrl -Method Post -Headers $headers -Body $bodyBytes
+        Invoke-RestMethod -Uri $WebhookUrl -Method Post -ContentType "multipart/form-data; boundary=$boundary" -Headers $headers -Body $bodyBytes
     }
 }
 
